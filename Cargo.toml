@@ -1,0 +1,6 @@
+[package]
+name = "recycler"
+version = "0.1.0"
+authors = ["Greg Fitzgerald <greg@solana.com>"]
+
+[dependencies]

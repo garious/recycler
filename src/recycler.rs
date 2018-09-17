@@ -6,6 +6,7 @@ pub trait Reset {
     fn reset(&mut self);
 }
 
+/// An value that's returned to its heap once dropped.
 pub struct Recyclable<'a, T: 'a + Default + Reset> {
     val: Option<T>,
     landfill: &'a Mutex<Vec<T>>,
@@ -31,7 +32,11 @@ impl<'a, T: Default + Reset> Drop for Recyclable<'a, T> {
     }
 }
 
-/// An object to minimize memory allocations.
+/// An object to minimize memory allocations. Use `allocate()`
+/// to get recyclable values of type `T`. When those recyclables
+/// are dropped, they're returned to the recycler. The next time
+/// `allocate()` is called, the value will be pulled from the
+/// recycler instead being allocated from memory.
 pub struct Recycler<T: Default + Reset> {
     landfill: Mutex<Vec<T>>,
 }

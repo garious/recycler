@@ -73,7 +73,7 @@ mod tests {
 
     use super::*;
     use std::sync::mpsc::channel;
-    use std::mem;
+    use std::sync::Arc;
 
     #[derive(Default)]
     struct Foo {
@@ -121,6 +121,42 @@ mod tests {
             assert_eq!(foo.as_ref().x, 1);
             assert_eq!(recycler.landfill.lock().unwrap().len(), 0);
         }
+        assert_eq!(recycler.landfill.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_window_received_first() {
+        let recycler: Recycler<Foo> = Recycler::default();
+        let mut window = vec![Some(Arc::new(recycler.allocate()))];
+
+        let (sender, receiver) = channel();
+
+        if let Some(ref item) = window[0] {
+            sender.send(item.clone()).unwrap();
+        }
+
+        receiver.recv().unwrap();
+        assert_eq!(recycler.landfill.lock().unwrap().len(), 0);
+
+        window[0].take();
+        assert_eq!(recycler.landfill.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_window_received_second() {
+        let recycler: Recycler<Foo> = Recycler::default();
+        let mut window = vec![Some(Arc::new(recycler.allocate()))];
+
+        let (sender, receiver) = channel();
+
+        if let Some(ref item) = window[0] {
+            sender.send(item.clone()).unwrap();
+        }
+
+        window[0].take();
+        assert_eq!(recycler.landfill.lock().unwrap().len(), 0);
+
+        receiver.recv().unwrap();
         assert_eq!(recycler.landfill.lock().unwrap().len(), 1);
     }
 
@@ -184,28 +220,5 @@ mod tests {
             });
             ThreadNanny { _hdl };
         }
-    }
-
-    #[test]
-    fn test_window() {
-        let recycler: Recycler<Foo> = Recycler::default();
-        let mut window = vec![None];
-        let (sender, receiver) = channel();
-        {
-            // item is in the window while its in the pipeline
-            // which is used to serve requests from other threads
-            let mut item = recycler.allocate();
-            item.as_mut().x = 1;
-            window[0] = Some(item);
-            sender.send(window[0].unwrap()).unwrap();
-        }
-        {
-            let foo = receiver.recv().unwrap();
-            assert_eq!(foo.as_ref().x, 1);
-            let old = mem::replace(&mut window[0], None).unwrap();
-            assert_eq!(old.as_ref().x, 1);
-        }
-        // only one thing should be in the landfill at the end
-        assert_eq!(recycler.landfill.lock().unwrap().len(), 1);
     }
 }

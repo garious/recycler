@@ -125,7 +125,7 @@ mod tests {
     }
 
     #[test]
-    fn test_threads() {
+    fn test_scoped_thread() {
         let recycler: Recycler<Foo> = Recycler::default();
         let (sender, receiver) = channel();
         sender.send(recycler.allocate()).unwrap();
@@ -135,6 +135,28 @@ mod tests {
                 receiver.recv().unwrap();
             });
         });
+
+        assert_eq!(recycler.landfill.lock().unwrap().len(), 1);
+    }
+
+    struct ThreadNanny<'a> {
+        _hdl: crossbeam::thread::ScopedJoinHandle<'a, ()>,
+    }
+
+    #[test]
+    fn test_thread_lifetime_in_struct() {
+        let recycler: Recycler<Foo> = Recycler::default();
+        let (sender, receiver) = channel();
+        sender.send(recycler.allocate()).unwrap();
+
+        {
+            let _hdl = crossbeam::scope(|scope| {
+                scope.spawn(move || {
+                    receiver.recv().unwrap();
+                })
+            });
+            ThreadNanny { _hdl };
+        }
 
         assert_eq!(recycler.landfill.lock().unwrap().len(), 1);
     }

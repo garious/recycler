@@ -107,6 +107,24 @@ mod tests {
         assert_eq!(recycler.landfill.lock().unwrap().len(), 0);
     }
     #[test]
+    fn test_channel() {
+        let recycler: Recycler<Foo> = Recycler::default();
+        let (sender, receiver) = channel();
+        {
+            let mut foo = recycler.allocate();
+            foo.as_mut().x = 1;
+            sender.send(foo).unwrap();
+            assert_eq!(recycler.landfill.lock().unwrap().len(), 0);
+        }
+        {
+            let foo = receiver.recv().unwrap();
+            assert_eq!(foo.as_ref().x, 1);
+            assert_eq!(recycler.landfill.lock().unwrap().len(), 0);
+        }
+        assert_eq!(recycler.landfill.lock().unwrap().len(), 1);
+    }
+
+    #[test]
     fn test_scoped_thread() {
         let recycler: Recycler<Foo> = Recycler::default();
         let (sender, receiver) = channel();

@@ -73,6 +73,7 @@ mod tests {
 
     use super::*;
     use std::sync::mpsc::channel;
+    use std::mem;
 
     #[derive(Default)]
     struct Foo {
@@ -105,25 +106,6 @@ mod tests {
         assert_eq!(foo.as_ref().x, 0);
         assert_eq!(recycler.landfill.lock().unwrap().len(), 0);
     }
-
-    #[test]
-    fn test_channel() {
-        let recycler: Recycler<Foo> = Recycler::default();
-        let (sender, receiver) = channel();
-        {
-            let mut foo = recycler.allocate();
-            foo.as_mut().x = 1;
-            sender.send(foo).unwrap();
-            assert_eq!(recycler.landfill.lock().unwrap().len(), 0);
-        }
-        {
-            let foo = receiver.recv().unwrap();
-            assert_eq!(foo.as_ref().x, 1);
-            assert_eq!(recycler.landfill.lock().unwrap().len(), 0);
-        }
-        assert_eq!(recycler.landfill.lock().unwrap().len(), 1);
-    }
-
     #[test]
     fn test_scoped_thread() {
         let recycler: Recycler<Foo> = Recycler::default();
@@ -184,7 +166,28 @@ mod tests {
             });
             ThreadNanny { _hdl };
         }
+    }
 
+    #[test]
+    fn test_window() {
+        let recycler: Recycler<Foo> = Recycler::default();
+        let mut window = vec![None];
+        let (sender, receiver) = channel();
+        {
+            // item is in the window while its in the pipeline
+            // which is used to serve requests from other threads
+            let mut item = recycler.allocate();
+            item.as_mut().x = 1;
+            window[0] = Some(item);
+            sender.send(window[0].unwrap()).unwrap();
+        }
+        {
+            let foo = receiver.recv().unwrap();
+            assert_eq!(foo.as_ref().x, 1);
+            let old = mem::replace(&mut window[0], None).unwrap();
+            assert_eq!(old.as_ref().x, 1);
+        }
+        // only one thing should be in the landfill at the end
         assert_eq!(recycler.landfill.lock().unwrap().len(), 1);
     }
 }

@@ -160,4 +160,31 @@ mod tests {
 
         assert_eq!(recycler.landfill.lock().unwrap().len(), 1);
     }
+
+    #[test]
+    fn test_recycling_across_threads() {
+        let recycler: Recycler<Foo> = Recycler::default();
+
+        let (sender, receiver) = channel();
+        {
+            let recycler = &recycler;
+            let _hdl = crossbeam::scope(|scope| {
+                scope.spawn(move || {
+                    sender.send(recycler.allocate()).unwrap();
+                })
+            });
+            ThreadNanny { _hdl };
+        }
+
+        {
+            let _hdl = crossbeam::scope(|scope| {
+                scope.spawn(move || {
+                    receiver.recv().unwrap();
+                })
+            });
+            ThreadNanny { _hdl };
+        }
+
+        assert_eq!(recycler.landfill.lock().unwrap().len(), 1);
+    }
 }

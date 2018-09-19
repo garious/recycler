@@ -4,3 +4,6 @@ version = "0.1.0"
 authors = ["Greg Fitzgerald <greg@solana.com>"]
 
 [dependencies]
+
+[dev-dependencies]
+crossbeam = "0.4.1"

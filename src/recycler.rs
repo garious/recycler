@@ -69,6 +69,8 @@ impl<T: Default + Reset> Recycler<T> {
 
 #[cfg(test)]
 mod tests {
+    extern crate crossbeam;
+
     use super::*;
     use std::sync::mpsc::channel;
 
@@ -119,6 +121,21 @@ mod tests {
             assert_eq!(foo.as_ref().x, 1);
             assert_eq!(recycler.landfill.lock().unwrap().len(), 0);
         }
+        assert_eq!(recycler.landfill.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_threads() {
+        let recycler: Recycler<Foo> = Recycler::default();
+        let (sender, receiver) = channel();
+        sender.send(recycler.allocate()).unwrap();
+
+        crossbeam::scope(|scope| {
+            scope.spawn(move || {
+                receiver.recv().unwrap();
+            });
+        });
+
         assert_eq!(recycler.landfill.lock().unwrap().len(), 1);
     }
 }

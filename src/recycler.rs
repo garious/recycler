@@ -69,8 +69,9 @@ impl<T: Default + Reset> Recycler<T> {
 
 #[cfg(test)]
 mod tests {
-    extern crate crossbeam;
+    extern crate crossbeam_utils;
 
+    use self::crossbeam_utils::thread;
     use super::*;
     use std::sync::mpsc::channel;
 
@@ -130,7 +131,7 @@ mod tests {
         let (sender, receiver) = channel();
         sender.send(recycler.allocate()).unwrap();
 
-        crossbeam::scope(|scope| {
+        thread::scope(|scope| {
             scope.spawn(move || {
                 receiver.recv().unwrap();
             });
@@ -140,7 +141,7 @@ mod tests {
     }
 
     struct ThreadNanny<'a> {
-        _hdl: crossbeam::thread::ScopedJoinHandle<'a, ()>,
+        _hdl: thread::ScopedJoinHandle<'a, ()>,
     }
 
     #[test]
@@ -150,7 +151,7 @@ mod tests {
         sender.send(recycler.allocate()).unwrap();
 
         {
-            let _hdl = crossbeam::scope(|scope| {
+            let _hdl = thread::scope(|scope| {
                 scope.spawn(move || {
                     receiver.recv().unwrap();
                 })
@@ -168,7 +169,7 @@ mod tests {
         let (sender, receiver) = channel();
         {
             let recycler = &recycler;
-            let _hdl = crossbeam::scope(|scope| {
+            let _hdl = thread::scope(|scope| {
                 scope.spawn(move || {
                     sender.send(recycler.allocate()).unwrap();
                 })
@@ -177,7 +178,7 @@ mod tests {
         }
 
         {
-            let _hdl = crossbeam::scope(|scope| {
+            let _hdl = thread::scope(|scope| {
                 scope.spawn(move || {
                     receiver.recv().unwrap();
                 })

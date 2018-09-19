@@ -6,4 +6,4 @@ authors = ["Greg Fitzgerald <greg@solana.com>"]
 [dependencies]
 
 [dev-dependencies]
-crossbeam = "0.4.1"
+crossbeam-utils = "0.5"

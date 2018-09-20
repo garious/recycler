@@ -74,6 +74,7 @@ mod tests {
     use self::crossbeam_utils::thread;
     use super::*;
     use std::sync::mpsc::channel;
+    use std::sync::Arc;
 
     #[derive(Default)]
     struct Foo {
@@ -106,7 +107,6 @@ mod tests {
         assert_eq!(foo.as_ref().x, 0);
         assert_eq!(recycler.landfill.lock().unwrap().len(), 0);
     }
-
     #[test]
     fn test_channel() {
         let recycler: Recycler<Foo> = Recycler::default();
@@ -122,6 +122,42 @@ mod tests {
             assert_eq!(foo.as_ref().x, 1);
             assert_eq!(recycler.landfill.lock().unwrap().len(), 0);
         }
+        assert_eq!(recycler.landfill.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_window_received_first() {
+        let recycler: Recycler<Foo> = Recycler::default();
+        let mut window = vec![Some(Arc::new(recycler.allocate()))];
+
+        let (sender, receiver) = channel();
+
+        if let Some(ref item) = window[0] {
+            sender.send(item.clone()).unwrap();
+        }
+
+        receiver.recv().unwrap();
+        assert_eq!(recycler.landfill.lock().unwrap().len(), 0);
+
+        window[0].take();
+        assert_eq!(recycler.landfill.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_window_received_second() {
+        let recycler: Recycler<Foo> = Recycler::default();
+        let mut window = vec![Some(Arc::new(recycler.allocate()))];
+
+        let (sender, receiver) = channel();
+
+        if let Some(ref item) = window[0] {
+            sender.send(item.clone()).unwrap();
+        }
+
+        window[0].take();
+        assert_eq!(recycler.landfill.lock().unwrap().len(), 0);
+
+        receiver.recv().unwrap();
         assert_eq!(recycler.landfill.lock().unwrap().len(), 1);
     }
 
@@ -185,7 +221,5 @@ mod tests {
             });
             ThreadNanny { _hdl };
         }
-
-        assert_eq!(recycler.landfill.lock().unwrap().len(), 1);
     }
 }
